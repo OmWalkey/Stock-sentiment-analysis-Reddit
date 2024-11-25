@@ -1,0 +1,80 @@
+# Import necessary libraries
+import praw  # For Reddit API interaction
+import pandas as pd  # For data manipulation
+from nltk.sentiment import SentimentIntensityAnalyzer  # For sentiment analysis
+import nltk  # For downloading necessary NLTK resources
+import re  # For regular expressions
+import datetime  # For handling timestamps
+import time  # For handling API rate limits
+
+# Download the required NLTK lexicon for sentiment analysis
+nltk.download("vader_lexicon")
+
+# Initialize the Sentiment Analyzer
+sia = SentimentIntensityAnalyzer()
+
+# Configure Reddit API credentials
+reddit = praw.Reddit(
+    client_id="your_client_id",
+    client_secret="your_client_secret",
+    user_agent="app/1.0 by /u/your_username"
+)
+
+def extract_tickers(text):
+    pattern = r'\b[A-Z]{2,5}\b'
+    words = re.findall(pattern, text)
+    return [word for word in words if word.isupper()]
+
+def analyze_reddit_sentiment(subreddit_name, limit=100):
+    """
+    Fetch posts from a subreddit, extract stock mentions, and perform sentiment analysis.
+    
+    Args:
+        subreddit_name (str): Name of the subreddit to fetch posts from.
+        limit (int): Number of posts to fetch.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the results of sentiment analysis and tickers.
+    """
+    posts = []
+
+    # Fetch hot posts from the subreddit
+    for post in reddit.subreddit(subreddit_name).hot(limit=limit):
+        title = post.title
+        selftext = post.selftext
+        text = f"{title} {selftext}"
+
+        if not text.strip():
+            continue  # Skip empty posts
+
+        tickers = extract_tickers(text)
+        sentiment = sia.polarity_scores(text)
+
+        # Save data for each detected ticker
+        for ticker in tickers:
+            posts.append({
+                "ticker": ticker,
+                "title": title,
+                "created_utc": datetime.datetime.utcfromtimestamp(post.created_utc),
+                "sentiment_compound": sentiment['compound'],
+                "sentiment_positive": sentiment['pos'],
+                "sentiment_negative": sentiment['neg'],
+                "sentiment_neutral": sentiment['neu'],
+                "post_url": post.url,
+                "score": post.score,
+                "num_comments": post.num_comments
+            })
+        time.sleep(1)  # Avoid hitting Reddit's rate limit
+
+    return pd.DataFrame(posts)
+
+if __name__ == "__main__":
+    subreddit_name = "wallstreetbets"  # Specify the subreddit
+    data = analyze_reddit_sentiment(subreddit_name, limit=100)
+
+    # Save data to a CSV file
+    if not data.empty:
+        data.to_csv("reddit_stock_sentiment.csv", index=False)
+        print("Data saved to 'reddit_stock_sentiment.csv'")
+    else:
+        print("No relevant data found.")
