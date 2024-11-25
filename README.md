@@ -11,3 +11,17 @@ Features
 Prerequisites
 - Python 3.8+
 - A Reddit developer account for API credentials.
+
+
+Install required Python libraries:
+pip install praw pandas scikit-learn nltk matplotlib
+
+
+Configure your Reddit API credentials:
+
+- Go to Reddit App Preferences.
+- Create a new script app and note the client_id, client_secret, and user_agent.
+- Update the script with these credentials.
+  
+Download NLTK resources:
+python -c "import nltk; nltk.download('vader_lexicon')"
